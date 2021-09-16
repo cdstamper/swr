@@ -1,6 +1,7 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
 import React, { useState } from 'react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import useSWR, { SWRConfig } from 'swr'
+
 import { sleep } from './utils'
 
 // This has to be an async function to wait a microtask to flush updates
@@ -14,6 +15,27 @@ describe('useSWR - refresh', () => {
   })
   afterAll(() => {
     jest.useRealTimers()
+  })
+  it('should not fail under mysterious circumstances', async () => {
+    let count = 0
+    function Page() {
+      const { data } = useSWR('dynamic-1', () => fetch(), {
+        refreshInterval: 2000,
+        dedupingInterval: 1000
+      })
+      return <div>count: {data}</div>
+    }
+
+    const fetch = () => count++
+
+    render(<Page />)
+
+    await act(() => advanceTimers(2000)) // update
+    screen.getByText('count:') // first is skipped so we expect no count yet
+    await act(() => advanceTimers(500))
+    //screen.getByText('count: 1') stil hasnt reached the timer
+    await act(() => advanceTimers(1501))
+    screen.getByText('count: 1') // timer has hit so we expect the next increment
   })
   it('should rerender automatically on interval', async () => {
     let count = 0
